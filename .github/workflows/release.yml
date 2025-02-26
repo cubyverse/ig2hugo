@@ -1,0 +1,135 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main ]
+
+# Berechtigungen für den gesamten Workflow
+permissions:
+  contents: write # Für das Erstellen von Releases und Pushen von Assets
+  packages: write # Falls Sie Packages verwenden
+  actions: read   # Für das Abrufen von Workflow-Informationen
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [linux, windows, darwin]
+        goarch: [amd64, arm64]
+        exclude:
+          - goos: windows
+            goarch: arm64
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.24'
+      
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          if [ "$GOOS" = "windows" ]; then
+            go build -o ig2hugo-${{ matrix.goos }}-${{ matrix.goarch }}.exe
+          else
+            go build -o ig2hugo-${{ matrix.goos }}-${{ matrix.goarch }}
+          fi
+      
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ig2hugo-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: |
+            ig2hugo-${{ matrix.goos }}-${{ matrix.goarch }}
+            ig2hugo-${{ matrix.goos }}-${{ matrix.goarch }}.exe
+
+  release:
+    name: Create Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+      
+      - name: Display structure of downloaded files
+        run: ls -R
+      
+      - name: Prepare assets for upload
+        run: |
+          mkdir -p release-assets
+          find . -type f -name "ig2hugo-*" -exec cp {} release-assets/ \;
+      
+      - name: Upload Release Assets (Linux AMD64)
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./release-assets/ig2hugo-linux-amd64
+          asset_name: ig2hugo-linux-amd64
+          asset_content_type: application/octet-stream
+      
+      - name: Upload Release Assets (Linux ARM64)
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./release-assets/ig2hugo-linux-arm64
+          asset_name: ig2hugo-linux-arm64
+          asset_content_type: application/octet-stream
+      
+      - name: Upload Release Assets (Windows AMD64)
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./release-assets/ig2hugo-windows-amd64.exe
+          asset_name: ig2hugo-windows-amd64.exe
+          asset_content_type: application/octet-stream
+      
+      - name: Upload Release Assets (macOS AMD64)
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./release-assets/ig2hugo-darwin-amd64
+          asset_name: ig2hugo-darwin-amd64
+          asset_content_type: application/octet-stream
+      
+      - name: Upload Release Assets (macOS ARM64)
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./release-assets/ig2hugo-darwin-arm64
+          asset_name: ig2hugo-darwin-arm64
+          asset_content_type: application/octet-stream 
