@@ -8,11 +8,11 @@ on:
   pull_request:
     branches: [ main ]
 
-# Berechtigungen für den gesamten Workflow
+# Permissions for the entire workflow
 permissions:
-  contents: write # Für das Erstellen von Releases und Pushen von Assets
-  packages: write # Falls Sie Packages verwenden
-  actions: read   # Für das Abrufen von Workflow-Informationen
+  contents: write # For creating releases and pushing assets
+  packages: write # In case you use packages
+  actions: read   # For retrieving workflow information
 
 jobs:
   build:
